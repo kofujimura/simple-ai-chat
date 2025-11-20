@@ -1,0 +1,138 @@
+.container {
+    max-width: 90%;
+    width: 90%;
+}
+
+.quiz-container {
+    margin: 0;
+    padding: 20px;
+    width: 100%;
+}
+
+.quiz-setup {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: none;
+}
+
+.quiz-playing {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: none;
+}
+
+.question {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.selections {
+    list-style: none;
+    padding: 0;
+}
+
+.selection-item {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    margin: 10px 0;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.selection-item:hover {
+    background: #e7f3ff;
+    border-color: #007bff;
+}
+
+.selection-item.selected {
+    background: #007bff;
+    color: white;
+    border-color: #0056b3;
+}
+
+.selection-item.correct {
+    background: #28a745;
+    color: white;
+    border-color: #1e7e34;
+}
+
+.selection-item.incorrect {
+    background: #dc3545;
+    color: white;
+    border-color: #c82333;
+}
+
+.quiz-progress {
+    text-align: center;
+    margin-bottom: 20px;
+    font-weight: bold;
+    color: #666;
+}
+
+.quiz-results {
+    text-align: center;
+    padding: 30px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: none;
+}
+
+.score {
+    font-size: 24px;
+    font-weight: bold;
+    color: #28a745;
+    margin-bottom: 20px;
+}
+
+.form-row {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+}
+
+.form-row .form-group {
+    min-width: 200px;
+}
+
+.form-row .form-group:last-child {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+}
+
+/* テーマ入力欄を大きくする */
+#quizTheme {
+    height: 80px;
+}
+
+.answer-feedback {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 5px;
+    font-weight: bold;
+    display: none;
+}
+
+.answer-feedback.correct {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.answer-feedback.incorrect {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}

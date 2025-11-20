@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Quiz Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="quiz.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Quiz Generator</h1>
+            <div class="settings-icon" onclick="toggleAccordion()">⚙️</div>
+        </div>
+
+        <!-- 設定アコーディオン -->
+        <div class="accordion" id="settingsAccordion">
+            <div class="accordion-content">
+                <div class="form-group">
+                    <label for="apiKey">Gemini API Key:</label>
+                    <input type="password" id="apiKey" placeholder="Enter your Gemini API key" onchange="saveSettings()">
+                </div>
+            </div>
+        </div>
+
+        <div class="quiz-container">
+            <!-- クイズ設定画面 -->
+            <div class="quiz-setup" id="quizSetup">
+                <div class="form-group">
+                    <label for="quizTitle">クイズのタイトル:</label>
+                    <input type="text" id="quizTitle" placeholder="例: ITパスポート対策クイズ" value="ITパスポート対策クイズ">
+                </div>
+                
+                <div class="form-group">
+                    <label for="quizTheme">テーマ:</label>
+                    <textarea id="quizTheme" placeholder="例: ITパスポート試験対策、プログラミング、ネットワークなど">ITパスポート試験の全分野（ストラテジ系・マネジメント系・テクノロジ系）から出題。経営戦略、システム開発、ネットワーク、セキュリティ、データベースなど幅広い分野を含む</textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="questionCount">問題数:</label>
+                        <input type="number" id="questionCount" min="1" max="20" value="5">
+                    </div>
+                    
+                    <div class="form-group">
+                        <button class="btn" onclick="generateQuiz()">クイズを生成</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- クイズ実行画面 -->
+            <div class="quiz-playing" id="quizPlaying">
+                <div class="quiz-progress" id="quizProgress"></div>
+                <h2 id="quizTitleDisplay"></h2>
+                
+                <div class="question" id="currentQuestion"></div>
+                
+                <ul class="selections" id="selections"></ul>
+                
+                <div class="answer-feedback" id="answerFeedback"></div>
+                
+                <button class="btn" id="nextBtn" onclick="nextQuestion()" style="display: none;">次の問題</button>
+                <button class="btn" id="finishBtn" onclick="showResults()" style="display: none;">結果を見る</button>
+            </div>
+
+            <!-- 結果画面 -->
+            <div class="quiz-results" id="quizResults">
+                <h2>クイズ結果</h2>
+                <div class="score" id="finalScore"></div>
+                <button class="btn" onclick="restartQuiz()">新しいクイズを作成</button>
+            </div>
+        </div>
+
+        <div class="status" id="status">Ready</div>
+        <div class="loading" id="loading">クイズを生成中...</div>
+    </div>
+
+    <script>
+        let quizData = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let selectedAnswer = null;
+        let hasAnswered = false;
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            checkApiKeyAndToggleAccordion();
+            updateStatus();
+        });
+
+        // 設定の保存
+        function saveSettings() {
+            const settings = {
+                apiKey: document.getElementById('apiKey').value
+            };
+            localStorage.setItem('quizSettings', JSON.stringify(settings));
+            checkApiKeyAndToggleAccordion();
+            updateStatus();
+        }
+
+        // 設定の読み込み
+        function loadSettings() {
+            const saved = localStorage.getItem('quizSettings');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                document.getElementById('apiKey').value = settings.apiKey || '';
+            }
+        }
+
+        // APIキーの有無でアコーディオンの初期状態を制御
+        function checkApiKeyAndToggleAccordion() {
+            const apiKey = document.getElementById('apiKey').value;
+            const accordion = document.getElementById('settingsAccordion');
+            
+            if (!apiKey.trim()) {
+                accordion.classList.add('open');
+            }
+        }
+
+        // アコーディオンの開閉
+        function toggleAccordion() {
+            const accordion = document.getElementById('settingsAccordion');
+            accordion.classList.toggle('open');
+        }
+
+        // ステータス更新
+        function updateStatus() {
+            const apiKey = document.getElementById('apiKey').value;
+            const statusEl = document.getElementById('status');
+            
+            if (!apiKey.trim()) {
+                statusEl.textContent = 'Please set your Gemini API key';
+                statusEl.style.color = '#dc3545';
+            } else {
+                statusEl.textContent = 'Ready to generate quiz';
+                statusEl.style.color = '#28a745';
+            }
+        }
+
+        // クイズ生成
+        async function generateQuiz() {
+            const apiKey = document.getElementById('apiKey').value;
+            if (!apiKey.trim()) {
+                alert('APIキーを設定してください');
+                return;
+            }
+
+            const title = document.getElementById('quizTitle').value.trim();
+            const theme = document.getElementById('quizTheme').value.trim();
+            const count = parseInt(document.getElementById('questionCount').value);
+
+            if (!title || !theme || count < 1) {
+                alert('すべての項目を正しく入力してください');
+                return;
+            }
+
+            document.getElementById('loading').classList.add('show');
+
+            try {
+                const systemPrompt = `あなたは${theme}に関するクイズを作成するAIです。以下の条件でクイズを作成してください：
+1. テーマ: ${theme}
+2. 問題数: ${count}問
+3. 各問題には3つの選択肢を提供
+4. 正解の選択肢のインデックス（0, 1, 2のいずれか）を指定
+5. 問題は適切な難易度で、楽しく学べる内容にする
+6. 必ずJSON形式で回答する
+
+回答例の形式：
+[
+  {
+    "question": "通るときには閉まって、通らないときには開いているものは何？",
+    "selections": ["踏み切り", "洗濯機", "冷蔵庫"],
+    "answer": 0
+  }
+]`;
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: systemPrompt }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 2000,
+                            response_mime_type: "application/json"
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error?.message || 'Gemini API error');
+                }
+
+                const data = await response.json();
+                const responseText = data.candidates[0].content.parts[0].text;
+                
+                try {
+                    quizData = JSON.parse(responseText);
+                    
+                    if (!Array.isArray(quizData) || quizData.length === 0) {
+                        throw new Error('Invalid quiz data format');
+                    }
+
+                    currentQuestionIndex = 0;
+                    score = 0;
+                    document.getElementById('quizTitleDisplay').textContent = title;
+                    startQuiz();
+                    
+                } catch (parseError) {
+                    throw new Error('クイズデータの解析に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('クイズの生成に失敗しました: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+
+        // クイズ開始
+        function startQuiz() {
+            document.getElementById('quizSetup').style.display = 'none';
+            document.getElementById('quizPlaying').style.display = 'block';
+            document.getElementById('quizResults').style.display = 'none';
+            showQuestion();
+        }
+
+        // 問題表示
+        function showQuestion() {
+            if (currentQuestionIndex >= quizData.length) {
+                showResults();
+                return;
+            }
+
+            const question = quizData[currentQuestionIndex];
+            hasAnswered = false;
+            selectedAnswer = null;
+
+            document.getElementById('quizProgress').textContent = 
+                `問題 ${currentQuestionIndex + 1} / ${quizData.length}`;
+            
+            document.getElementById('currentQuestion').textContent = question.question;
+            
+            const selectionsEl = document.getElementById('selections');
+            selectionsEl.innerHTML = '';
+            
+            question.selections.forEach((selection, index) => {
+                const li = document.createElement('li');
+                li.className = 'selection-item';
+                li.textContent = selection;
+                li.onclick = () => selectAnswer(index);
+                selectionsEl.appendChild(li);
+            });
+
+            document.getElementById('answerFeedback').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('finishBtn').style.display = 'none';
+        }
+
+        // 答え選択
+        function selectAnswer(index) {
+            if (hasAnswered) return;
+
+            selectedAnswer = index;
+            hasAnswered = true;
+
+            const question = quizData[currentQuestionIndex];
+            const correctAnswer = question.answer;
+            const isCorrect = selectedAnswer === correctAnswer;
+
+            if (isCorrect) {
+                score++;
+            }
+
+            const selectionItems = document.querySelectorAll('.selection-item');
+            selectionItems.forEach((item, i) => {
+                item.onclick = null;
+                if (i === correctAnswer) {
+                    item.classList.add('correct');
+                } else if (i === selectedAnswer && !isCorrect) {
+                    item.classList.add('incorrect');
+                }
+            });
+
+            const feedback = document.getElementById('answerFeedback');
+            feedback.style.display = 'block';
+            if (isCorrect) {
+                feedback.className = 'answer-feedback correct';
+                feedback.textContent = '正解！';
+            } else {
+                feedback.className = 'answer-feedback incorrect';
+                feedback.textContent = `不正解。正解は「${question.selections[correctAnswer]}」です。`;
+            }
+
+            if (currentQuestionIndex < quizData.length - 1) {
+                document.getElementById('nextBtn').style.display = 'inline-block';
+            } else {
+                document.getElementById('finishBtn').style.display = 'inline-block';
+            }
+        }
+
+        // 次の問題
+        function nextQuestion() {
+            currentQuestionIndex++;
+            showQuestion();
+        }
+
+        // 結果表示
+        function showResults() {
+            document.getElementById('quizPlaying').style.display = 'none';
+            document.getElementById('quizResults').style.display = 'block';
+            
+            const percentage = Math.round((score / quizData.length) * 100);
+            document.getElementById('finalScore').textContent = 
+                `${score} / ${quizData.length} 問正解 (${percentage}%)`;
+        }
+
+        // クイズリスタート
+        function restartQuiz() {
+            document.getElementById('quizResults').style.display = 'none';
+            document.getElementById('quizSetup').style.display = 'block';
+            quizData = [];
+            currentQuestionIndex = 0;
+            score = 0;
+        }
+    </script>
+</body>
+</html>
